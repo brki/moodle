@@ -648,6 +648,18 @@ class auth_plugin_ldap extends auth_plugin_base {
             if (empty($context)) {
                 continue;
             }
+
+            // perl hack to get around missing php paging limit:
+            if (!$this->perl_get_users($context, $filter, 900)) {
+                // if something went wrong, clean up and exit
+                $dbman->drop_temp_table($table);
+                $this->ldap_close();
+                print "Exiting sync script; something went wrong while trying to get a list of users\n\n";
+                exit;
+            }
+            continue;
+            // not reached, because the perl hack function is taking care of this.
+
             if ($this->config->search_sub) {
                 //use ldap_search to find first user from subtree
                 $ldap_result = ldap_search($ldapconnection, $context,
@@ -2020,6 +2032,128 @@ class auth_plugin_ldap extends auth_plugin_base {
 
         return ldap_find_userdn($ldapconnection, $extusername, $ldap_contexts, $this->config->objectclass,
                                 $this->config->user_attribute, $this->config->search_sub);
+    }
+
+    /**
+     * Use perl to get a list of users from LDAP, and insert them into the temp table created for processing ldap users.
+     *
+     * This function is necessary because PHP does not support LDAP paging, and so
+     * a query that would return > 1000 records would return only 1000 records.
+     * If possible, raise the limit on the LDAP side.  If the LDAP administrator refuses, use this workaround.
+     * See https://bugs.php.net/bug.php?id=42060 .
+     *
+     * @param string $context ldap context
+     * @param string $filter ldap filter
+     * @param int $pagesize how many records to fetch at a time
+     * @return boolean true on success.  If false, something bad went wrong and execution should be aborted after cleanup.
+     */
+    function perl_get_users($context, $filter, $pagesize)
+    {
+        global $CFG;
+        $textlib = textlib_get_instance();
+
+        // Remove any files that were abandoned due to a failed previous run (although every effort
+        // is made to not leave old files around), and then create the directory used for passing
+        // params to the perl script.
+        $tempdir = $this->perl_temp_dir();
+        remove_dir($tempdir);
+        if (!check_dir_exists($tempdir)) {
+            echo "Unable to create temporary directory $tempdir for perl script.\n";
+            return false;
+        }
+
+        // Fetch a list of usernames from ldap, using perl because as of PHP 5.3, PHP does not support LDAP paging.
+        if (!$paramfile = tempnam($tempdir, 'perlldap')) {
+            echo "Unable to create temporary file $paramfile for perl script.\n";
+            return false;
+        }
+        if (!chmod($paramfile, 0600)) {
+            echo "Unable to change permissions on temporary file $paramfile.\n";
+            return false;
+        }
+        $params = 'ldap_server :: ' . implode("','", explode(";",$this->config->host_url)) . "\n"
+            . 'ad_ldap_dn :: ' . $this->config->bind_dn . "\n"
+            . 'ad_ldap_password :: ' . $this->config->bind_pw . "\n"
+            . 'ad_ldap_version :: ' . $this->config->ldap_version . "\n"
+            . 'size_limit :: ' . $pagesize . "\n"
+            . 'base :: ' . $context . "\n"
+            . 'scope :: ' . ($this->config->search_sub ? "sub" : "base") . "\n" 
+            . 'filter :: ' . $filter . "\n"
+            . 'attrs :: ' . $this->config->user_attribute . "\n";
+        file_put_contents($paramfile, $params);
+
+        echo "Getting users from ldap for context: '$context' ...\n";
+        $perl_script = $CFG->dirroot. '/auth/' . $this->authtype . '/cli/perl_get_users.pl';
+        exec('/usr/bin/perl ' . $perl_script . ' ' . escapeshellarg($paramfile), $ldap_result, $ldap_status);
+        unlink($paramfile);
+        echo "Finished getting users from ldap for context '$context'.\n";
+
+        switch ($ldap_status) {
+            case 0:
+                break;
+
+            case 2:
+                print get_string('auth_ldap_connecterror', 'auth');
+                return false;
+                break;
+
+            case 3:
+                print get_string('auth_ldap_binderror', 'auth');
+                return false;
+                break;
+
+            case 4:
+                print "LDAP param file ($paramfile) could not be read";
+                return false;
+                break;
+
+            case 5:
+                print "LDAP param file ($paramfile) did not contain expected variables";
+                return false;
+                break;
+
+            default:
+                print get_string('auth_ldap_miscerror', 'auth');
+                return false;
+                break;
+        }
+
+        if(!$ldap_result) {
+            // no users matched, but this is not an error
+            return true;
+        }
+
+        // Insert the usernames into the temp table, so that they can later be synchronized to the user table.
+        foreach($ldap_result as $ldap_output) {
+            $output = explode(' :: ', $ldap_output);
+
+            // Avoid creating users from warnings or debug output from the perl script: all usernames are
+            // expected to be prefixed with 'ldapattr :: '.
+            if ($output[0] !== 'ldapattr' ) {
+                print "WARNING: unexpected output from perl script: $ldap_output\n";
+                continue;
+            }
+            $username = $textlib->convert(trim($output[1]), $this->config->ldapencoding, 'utf-8');
+
+            if ($username) {
+                $this->ldap_bulk_insert($username);
+            }
+        }
+        unset ($ldap_result);
+        return true;
+    }
+
+    function perl_temp_dir()
+    {
+        global $CFG;
+
+        if (isset($CFG->ldap_perl_temp_dir)) {
+            $base = $CFG->ldap_perl_temp_dir;
+        } else {
+            $base = $CFG->dataroot;
+        }
+        // Append something to the base, to avoid deleting anything important in case of misconfiguration.
+        return $base . '/temp/perlldap';
     }
 
 } // End of the class
