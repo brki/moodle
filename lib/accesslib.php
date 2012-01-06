@@ -3866,15 +3866,16 @@ function get_user_capability_course($capability, $userid = null, $doanything = t
                                          ON (c.id=x.instanceid AND x.contextlevel=".CONTEXT_COURSE.")
                                 $orderby");
     // Check capability for each course in turn
-    foreach ($rs as $coursecontext) {
+    foreach ($rs as $courseinfo) {
+        $coursecontext = context_course::instance($courseinfo->courseid);
         if (has_capability($capability, $coursecontext, $userid, $doanything)) {
             // We've got the capability. Make the record look like a course record
             // and store it
-            $coursecontext->id = $coursecontext->courseid;
-            unset($coursecontext->courseid);
-            unset($coursecontext->contextlevel);
-            unset($coursecontext->instanceid);
-            $courses[] = $coursecontext;
+            $courseinfo->id = $courseinfo->courseid;
+            unset($courseinfo->courseid);
+            unset($courseinfo->contextlevel);
+            unset($courseinfo->instanceid);
+            $courses[] = $courseinfo;
         }
     }
     $rs->close();
