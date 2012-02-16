@@ -1062,7 +1062,7 @@ class global_navigation extends navigation_node {
         $mycourses = enrol_get_my_courses(NULL, 'visible DESC,sortorder ASC', $limit);
         $showallcourses = (count($mycourses) == 0 || !empty($CFG->navshowallcourses));
         $showcategories = ($showallcourses && $this->show_categories());
-        $issite = ($this->page->course->id == SITEID);
+        $issite = ($this->page->context->contextlevel == CONTEXT_COURSE && $this->page->course->id == SITEID);
         $ismycourse = (array_key_exists($this->page->course->id, $mycourses));
 
         // Check if any courses were returned.
