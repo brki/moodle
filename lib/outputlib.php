@@ -352,6 +352,7 @@ class theme_config {
 
         } else {
             // bad luck, the requested theme has some problems - admin see details in theme config
+            debugging("Theme '$themename' not found, using standard theme instead");
             return new theme_config(theme_config::find_theme_config(theme_config::DEFAULT_THEME, $settings));
         }
     }
