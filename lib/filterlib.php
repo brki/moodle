@@ -1493,3 +1493,110 @@ function filter_add_javascript($text) {
     //last chance - try adding head element
     return preg_replace("/<html.*?>/is", "\\0<head>".$js.'</head>', $text);
 }
+
+/**
+ * Preloads filters used for course categories.
+ * This reduces the database queries necessary when many categories
+ * will be processed.  It adds entries to the $FILTERLIB_PRIVATE variable
+ * if there are any filters active for any course categories.
+ */
+function filter_preload_course_categories()
+{
+    global $DB, $FILTERLIB_PRIVATE;
+
+    if (!isset($FILTERLIB_PRIVATE)) {
+        $FILTERLIB_PRIVATE = new stdClass();
+    }
+
+    if (!isset($FILTERLIB_PRIVATE->active)) {
+        $FILTERLIB_PRIVATE->active = array();
+    }
+
+    $columns = context_helper::get_preload_record_columns_sql('ctx');
+    $rs = $DB->get_recordset_sql("
+        SELECT id, path, $columns
+        FROM {context} ctx
+        WHERE id = 1
+           OR contextlevel = :coursecatcontext
+        ORDER BY path
+        ", array('coursecatcontext' => CONTEXT_COURSECAT ));
+
+    $contexts = array();
+    foreach ($rs as $contextrecord) {
+        context_helper::preload_from_record($contextrecord);
+        $contexts[$contextrecord->id] = context::instance_by_id($contextrecord->id);
+    }
+    $rs->close();
+
+    $rs = $DB->get_recordset_sql("
+      SELECT active.filter, c.path, active.contextid, active.is_active, fc.name, fc.value
+      FROM mdl_context c,
+        (SELECT f.filter, f.contextid, MAX(f.sortorder) AS sortorder, f.active, ctx.depth,
+        CASE WHEN max(f.active * ctx.depth) > -min(f.active * ctx.depth) THEN 1 ELSE 0 END AS is_active
+        FROM mdl_filter_active f
+        JOIN mdl_context ctx ON f.contextid = ctx.id
+        WHERE ctx.id = 1
+           OR ctx.contextlevel = 40
+        GROUP BY filter, f.contextid, f.active, ctx.depth) active
+      LEFT JOIN mdl_filter_config fc ON fc.filter = active.filter
+      WHERE c.id = active.contextid
+      ORDER BY active.contextid, c.path, active.sortorder
+      ");
+
+    $activefilters = array();
+    $inactivefilters = array();
+    foreach ($rs as $state) {
+        $contextid = $state->contextid;
+        $filter = $state->filter;
+        if ($state->is_active) {
+            if (!isset($activefilters[$contextid])) {
+                $activefilters[$contextid] = array();
+            }
+            if (!isset($activefilters[$contextid][$filter])) {
+                $activefilters[$contextid][$filter] = array();
+            }
+            if (!is_null($state->name)) {
+                $activefilters[$contextid][$filter][$state->name] = $state->value;
+            }
+        } else {
+            if (!isset($inactivefilters[$contextid])) {
+                $inactivefilters[$contextid] = array();
+            }
+            $inactivefilters[$contextid][$filter] = 1;
+        }
+    }
+    $rs->close();
+
+    foreach ($contexts as $contextid => $context) {
+        if ($filters = find_active_filters($context, $contexts, $activefilters, $inactivefilters)) {
+            $FILTERLIB_PRIVATE->active[$contextid] = $filters;
+        }
+    }
+}
+
+/**
+ * Helper function for filter_preload_course_categories() to extract
+ * the active filters for the given context.
+ *
+ * @param context_coursecat $context
+ * @param array $contexts
+ * @param array $activefilters
+ * @param array $inactivefilters
+ */
+function find_active_filters($context, $contexts, $activefilters, $inactivefilters)
+{
+    $currentcontext = $context;
+    while (1) {
+        $ctx = $currentcontext->id;
+        if (isset($activefilters[$ctx])) {
+            return $activefilters[$ctx];
+        }
+        if (isset($inactivefilters[$ctx])) {
+            return false;
+        }
+        if (!$parent = $currentcontext->get_parent_context()) {
+            return false;
+        }
+        $currentcontext = $contexts[$parent->id];
+    }
+}

@@ -66,6 +66,9 @@ $strdelete = get_string('delete');
 $straction = get_string('action');
 $strfulllistofcourses = get_string('fulllistofcourses');
 
+if (!empty($CFG->filterall)) {
+    filter_preload_course_categories();
+}
 
 /// Unless it's an editing admin, just print the regular listing of courses/categories
 if (!$adminediting) {
