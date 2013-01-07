@@ -5726,6 +5726,28 @@ class context_helper extends context {
     }
 
     /**
+     * Preloads the context for all course categories.
+     * This reduces the database queries necessary when many categories
+     * will be processed.
+     */
+    public static function preload_course_categories() {
+        global $DB;
+
+        $columns = context_helper::get_preload_record_columns_sql('ctx');
+        $rs = $DB->get_recordset_sql("
+            SELECT id, $columns
+            FROM {context} ctx
+            WHERE id = 1
+               OR contextlevel = :coursecatcontext",
+               array('coursecatcontext' => CONTEXT_COURSECAT ));
+
+        foreach ($rs as $contextrecord) {
+            context_helper::preload_from_record($contextrecord);
+        }
+        $rs->close();
+    }
+
+    /**
      * Delete context instance
      *
      * @static

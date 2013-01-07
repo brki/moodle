@@ -79,6 +79,10 @@ if (!$category->visible) {
     require_capability('moodle/category:viewhiddencategories', $context);
 }
 
+if (!empty($CFG->filterall)) {
+    context_helper::preload_course_categories();
+}
+
 $canmanage = has_capability('moodle/category:manage', $context);
 $sesskeyprovided = !empty($sesskey) && confirm_sesskey($sesskey);
 
