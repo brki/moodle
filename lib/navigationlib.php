@@ -2647,6 +2647,13 @@ class global_navigation extends navigation_node {
             return true;
         }
 
+        // If $course is the front page, check for permissions in the front page context instead of $this->page->context
+        if ($course->id == 1) {
+            $context = context_course::instance(SITEID);
+        } else {
+            $context = $this->page->context;
+        }
+
         // Hidden node that we use to determine if the front page navigation is loaded.
         // This required as there are not other guaranteed nodes that may be loaded.
         $coursenode->add('frontpageloaded', null, self::TYPE_CUSTOM, null, 'frontpageloaded')->display = false;
@@ -2667,7 +2674,7 @@ class global_navigation extends navigation_node {
         }
 
         // Notes
-        if (!empty($CFG->enablenotes) && (has_capability('moodle/notes:manage', $this->page->context) || has_capability('moodle/notes:view', $this->page->context))) {
+        if (!empty($CFG->enablenotes) && (has_capability('moodle/notes:manage', $context) || has_capability('moodle/notes:view', $context))) {
             $coursenode->add(get_string('notes','notes'), new moodle_url('/notes/index.php', array('filtertype'=>'course', 'filterselect'=>$filterselect)));
         }
 
@@ -2683,7 +2690,7 @@ class global_navigation extends navigation_node {
         }
 
         // View course reports
-        if (has_capability('moodle/site:viewreports', $this->page->context)) { // basic capability for listing of reports
+        if (has_capability('moodle/site:viewreports', $context)) { // basic capability for listing of reports
             $reportnav = $coursenode->add(get_string('reports'), null, self::TYPE_CONTAINER, null, null, new pix_icon('i/stats', ''));
             $coursereports = get_plugin_list('coursereport'); // deprecated
             foreach ($coursereports as $report=>$dir) {
@@ -2692,14 +2699,14 @@ class global_navigation extends navigation_node {
                     require_once($libfile);
                     $reportfunction = $report.'_report_extend_navigation';
                     if (function_exists($report.'_report_extend_navigation')) {
-                        $reportfunction($reportnav, $course, $this->page->context);
+                        $reportfunction($reportnav, $course, $context);
                     }
                 }
             }
 
             $reports = get_plugin_list_with_function('report', 'extend_navigation_course', 'lib.php');
             foreach ($reports as $reportfunction) {
-                $reportfunction($reportnav, $course, $this->page->context);
+                $reportfunction($reportnav, $course, $context);
             }
         }
         return true;
