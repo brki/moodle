@@ -1731,7 +1731,7 @@ function user_accesstime_log($courseid=0) {
  * @param string $limitfrom return a subset of records, starting at this point (optional, required if $limitnum is set)
  * @param int $limitnum return a subset comprising this many records (optional, required if $limitfrom is set)
  * @param int $totalcount Passed in by reference.
- * @return array
+ * @return moodle_recordset
  */
 function get_logs($select, array $params=null, $order='l.time DESC', $limitfrom='', $limitnum='', &$totalcount) {
     global $DB;
@@ -1759,7 +1759,7 @@ function get_logs($select, array $params=null, $order='l.time DESC', $limitfrom=
            $select
             $order";
 
-    return $DB->get_records_sql($sql, $params, $limitfrom, $limitnum) ;
+    return $DB->get_recordset_sql($sql, $params, $limitfrom, $limitnum);
 }
 
 
