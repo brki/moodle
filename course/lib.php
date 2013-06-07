@@ -302,7 +302,7 @@ function build_logs_array($course, $user=0, $date=0, $order="l.time ASC", $limit
 
     $totalcount = 0;  // Initialise
     $result = array();
-    $result['logs'] = get_logs($selector, $params, $order, $limitfrom, $limitnum, $totalcount);
+    $result['logsrecordset'] = get_logs($selector, $params, $order, $limitfrom, $limitnum, $totalcount);
     $result['totalcount'] = $totalcount;
     return $result;
 }
@@ -313,8 +313,10 @@ function print_log($course, $user=0, $date=0, $order="l.time ASC", $page=0, $per
 
     global $CFG, $DB, $OUTPUT;
 
-    if (!$logs = build_logs_array($course, $user, $date, $order, $page*$perpage, $perpage,
-                       $modname, $modid, $modaction, $groupid)) {
+    $logs = build_logs_array($course, $user, $date, $order, $page*$perpage, $perpage, $modname, $modid, $modaction, $groupid);
+    $rs = $logs['logsrecordset'];
+    if (!$rs->valid()) {
+        $rs->close();
         echo $OUTPUT->notification("No logs found!");
         echo $OUTPUT->footer();
         exit;
@@ -369,7 +371,7 @@ function print_log($course, $user=0, $date=0, $order="l.time ASC", $page=0, $per
         $logs['logs'] = array();
     }
 
-    foreach ($logs['logs'] as $log) {
+    foreach ($rs as $log) {
 
         if (isset($ldcache[$log->module][$log->action])) {
             $ld = $ldcache[$log->module][$log->action];
@@ -420,6 +422,7 @@ function print_log($course, $user=0, $date=0, $order="l.time ASC", $page=0, $per
         $table->data[] = $row;
     }
 
+    $rs->close();
     echo html_writer::table($table);
     echo $OUTPUT->paging_bar($totalcount, $page, $perpage, "$url&perpage=$perpage");
 }
@@ -573,11 +576,15 @@ function print_log_csv($course, $user, $date, $order='l.time DESC', $modname,
     echo get_string('savedat').userdate(time(), $strftimedatetime)."\n";
     echo $text."\n";
 
-    if (empty($logs['logs'])) {
+    $rs = $logs['logsrecordset'];
+    if (!$rs->valid()) {
+        $rs->close();
         return true;
     }
+    // prevent timeout for large log reports
+    set_time_limit(600);
 
-    foreach ($logs['logs'] as $log) {
+    foreach ($rs as $log) {
         if (isset($ldcache[$log->module][$log->action])) {
             $ld = $ldcache[$log->module][$log->action];
         } else {
@@ -606,6 +613,7 @@ function print_log_csv($course, $user, $date, $order='l.time DESC', $modname,
         $text = implode("\t", $row);
         echo $text." \n";
     }
+    $rs->close();
     return true;
 }
 
@@ -642,7 +650,7 @@ function print_log_xls($course, $user, $date, $order='l.time DESC', $modname,
 
     $strftimedatetime = get_string("strftimedatetime");
 
-    $nroPages = ceil(count($logs)/(EXCELROWS-FIRSTUSEDEXCELROW+1));
+    $nroPages = max(1, ceil($logs['totalcount']/(EXCELROWS-FIRSTUSEDEXCELROW+1)));
     $filename = 'logs_'.userdate(time(),get_string('backupnameformat', 'langconfig'),99,false);
     $filename .= '.xls';
 
@@ -667,10 +675,14 @@ function print_log_xls($course, $user, $date, $order='l.time DESC', $modname,
         }
     }
 
-    if (empty($logs['logs'])) {
+    $rs = $logs['logsrecordset'];
+    if (!$rs->valid()) {
+        $rs->close();
         $workbook->close();
         return true;
     }
+    // prevent timeout for large log reports
+    set_time_limit(600);
 
     $formatDate =& $workbook->add_format();
     $formatDate->set_num_format(get_string('log_excel_date_format'));
@@ -678,7 +690,7 @@ function print_log_xls($course, $user, $date, $order='l.time DESC', $modname,
     $row = FIRSTUSEDEXCELROW;
     $wsnumber = 1;
     $myxls =& $worksheet[$wsnumber];
-    foreach ($logs['logs'] as $log) {
+    foreach ($rs as $log) {
         if (isset($ldcache[$log->module][$log->action])) {
             $ld = $ldcache[$log->module][$log->action];
         } else {
@@ -720,6 +732,7 @@ function print_log_xls($course, $user, $date, $order='l.time DESC', $modname,
         $row++;
     }
 
+    $rs->close();
     $workbook->close();
     return true;
 }
@@ -756,7 +769,7 @@ function print_log_ods($course, $user, $date, $order='l.time DESC', $modname,
 
     $strftimedatetime = get_string("strftimedatetime");
 
-    $nroPages = ceil(count($logs)/(EXCELROWS-FIRSTUSEDEXCELROW+1));
+    $nroPages = max(1, ceil($logs['totalcount']/(EXCELROWS-FIRSTUSEDEXCELROW+1)));
     $filename = 'logs_'.userdate(time(),get_string('backupnameformat', 'langconfig'),99,false);
     $filename .= '.ods';
 
@@ -781,10 +794,16 @@ function print_log_ods($course, $user, $date, $order='l.time DESC', $modname,
         }
     }
 
-    if (empty($logs['logs'])) {
+    $rs = $logs['logsrecordset'];
+    if (!$rs->valid()) {
+        $rs->close();
         $workbook->close();
         return true;
     }
+    // Prevent timeout for large log reports:
+    set_time_limit(600);
+    // The ODS code collects everything in memory before writing it to a file, try to avoid an out of memory error:
+    raise_memory_limit(MEMORY_EXTRA);
 
     $formatDate =& $workbook->add_format();
     $formatDate->set_num_format(get_string('log_excel_date_format'));
@@ -792,7 +811,7 @@ function print_log_ods($course, $user, $date, $order='l.time DESC', $modname,
     $row = FIRSTUSEDEXCELROW;
     $wsnumber = 1;
     $myxls =& $worksheet[$wsnumber];
-    foreach ($logs['logs'] as $log) {
+    foreach ($rs as $log) {
         if (isset($ldcache[$log->module][$log->action])) {
             $ld = $ldcache[$log->module][$log->action];
         } else {
@@ -834,6 +853,7 @@ function print_log_ods($course, $user, $date, $order='l.time DESC', $modname,
         $row++;
     }
 
+    $rs->close();
     $workbook->close();
     return true;
 }
