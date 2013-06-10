@@ -331,7 +331,7 @@ class restore_category_search extends restore_search_base  {
             'namesearch' => '%'.$this->get_search().'%',
         );
 
-        $select     = " SELECT c.id,c.name,c.visible,c.sortorder,c.description,c.descriptionformat ";
+        $select     = " SELECT c.id,c.name,c.visible,c.sortorder,c.description,c.descriptionformat, c.parent ";
         $from       = " FROM {course_categories} c ";
         $where      = " WHERE ".$DB->sql_like('c.name', ':namesearch', false);
         $orderby    = " ORDER BY c.sortorder";

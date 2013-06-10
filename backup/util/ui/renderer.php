@@ -653,7 +653,14 @@ class core_backup_renderer extends plugin_renderer_base {
         $table->data = array();
 
         if ($component->get_count() !== 0) {
+            $categorylist = coursecat::make_categories_list();
+            $strparent = get_string('parentcategory');
             foreach ($component->get_results() as $category) {
+                $parent = '';
+                if ($category->parent && isset($categorylist[$category->parent])) {
+                    $parent = html_writer::empty_tag('br')
+                        . html_writer::tag('span', $strparent . ': ' . $categorylist[$category->parent], array('class' => 'dimmed_text'));
+                }
                 $row = new html_table_row();
                 $row->attributes['class'] = 'rcs-course';
                 if (!$category->visible) {
@@ -661,7 +668,8 @@ class core_backup_renderer extends plugin_renderer_base {
                 }
                 $row->cells = array(
                     html_writer::empty_tag('input', array('type'=>'radio', 'name'=>'targetid', 'value'=>$category->id)),
-                    format_string($category->name, true, array('context' => context_coursecat::instance($category->id))),
+                    format_string($category->name, true, array('context' => context_coursecat::instance($category->id)))
+                    . $parent,
                     format_text($category->description, $category->descriptionformat, array('overflowdiv'=>true))
                 );
                 $table->data[] = $row;
