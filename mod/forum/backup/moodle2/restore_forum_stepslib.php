@@ -176,7 +176,7 @@ class restore_forum_activity_structure_step extends restore_activity_structure_s
     }
 
     protected function after_execute() {
-        global $DB;
+        global $CFG, $DB;
 
         // Add forum related files, no need to match by itemname (just internally handled context)
         $this->add_related_files('mod_forum', 'intro', null);
@@ -187,6 +187,7 @@ class restore_forum_activity_structure_step extends restore_activity_structure_s
         $forumid = $this->task->get_activityid();
         $forumrec = $DB->get_record('forum', array('id' => $forumid));
         if ($forumrec->type == 'single' && !$DB->record_exists('forum_discussions', array('forum' => $forumid))) {
+            require_once($CFG->dirroot . '/mod/forum/locallib.php');
             // Create single discussion/lead post from forum data
             $sd = new stdclass();
             $sd->course   = $forumrec->course;

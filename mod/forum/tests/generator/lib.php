@@ -116,7 +116,8 @@ class mod_forum_generator extends testing_module_generator {
      * @return stdClass the discussion object
      */
     public function create_discussion($record = null) {
-        global $DB;
+        global $DB, $CFG;
+        require_once("$CFG->dirroot/mod/forum/locallib.php");
 
         // Increment the forum discussion count.
         $this->forumdiscussioncount++;

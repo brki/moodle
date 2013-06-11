@@ -566,3 +566,213 @@ class forum_file_info_container extends file_info {
         return $this->browser->get_file_info($this->context);
     }
 }
+
+/**
+ * If successful, this function returns the name of the file
+ *
+ * @global object
+ * @param object $post is a full post record, including course and forum
+ * @param object $forum
+ * @param object $cm
+ * @param mixed $mform
+ * @param string $unused
+ * @return bool
+ */
+function forum_add_attachment($post, $forum, $cm, $mform=null, $unused=null) {
+    global $DB, $CFG;
+    require_once($CFG->dirroot . '/mod/forum/post_form.php');
+
+    if (empty($mform)) {
+        return false;
+    }
+
+    if (empty($post->attachments)) {
+        return true;   // Nothing to do
+    }
+
+    $context = context_module::instance($cm->id);
+
+    $info = file_get_draft_area_info($post->attachments);
+    $present = ($info['filecount']>0) ? '1' : '';
+    file_save_draft_area_files($post->attachments, $context->id, 'mod_forum', 'attachment', $post->id,
+        mod_forum_post_form::attachment_options($forum));
+
+    $DB->set_field('forum_posts', 'attachment', $present, array('id'=>$post->id));
+
+    return true;
+}
+
+/**
+ * Add a new post in an existing discussion.
+ *
+ * @global object
+ * @global object
+ * @global object
+ * @param object $post
+ * @param mixed $mform
+ * @param string $message
+ * @return int
+ */
+function forum_add_new_post($post, $mform, &$message) {
+    global $USER, $CFG, $DB;
+    require_once($CFG->dirroot . '/mod/forum/post_form.php');
+
+    $discussion = $DB->get_record('forum_discussions', array('id' => $post->discussion));
+    $forum      = $DB->get_record('forum', array('id' => $discussion->forum));
+    $cm         = get_coursemodule_from_instance('forum', $forum->id);
+    $context    = context_module::instance($cm->id);
+
+    $post->created    = $post->modified = time();
+    $post->mailed     = FORUM_MAILED_PENDING;
+    $post->userid     = $USER->id;
+    $post->attachment = "";
+
+    $post->id = $DB->insert_record("forum_posts", $post);
+    $post->message = file_save_draft_area_files($post->itemid, $context->id, 'mod_forum', 'post', $post->id,
+        mod_forum_post_form::editor_options(), $post->message);
+    $DB->set_field('forum_posts', 'message', $post->message, array('id'=>$post->id));
+    forum_add_attachment($post, $forum, $cm, $mform, $message);
+
+    // Update discussion modified date
+    $DB->set_field("forum_discussions", "timemodified", $post->modified, array("id" => $post->discussion));
+    $DB->set_field("forum_discussions", "usermodified", $post->userid, array("id" => $post->discussion));
+
+    if (forum_tp_can_track_forums($forum) && forum_tp_is_tracked($forum)) {
+        forum_tp_mark_post_read($post->userid, $post, $post->forum);
+    }
+
+    // Let Moodle know that assessable content is uploaded (eg for plagiarism detection)
+    forum_trigger_content_uploaded_event($post, $cm, 'forum_add_new_post');
+
+    return $post->id;
+}
+
+/**
+ * Update a post
+ *
+ * @global object
+ * @global object
+ * @global object
+ * @param object $post
+ * @param mixed $mform
+ * @param string $message
+ * @return bool
+ */
+function forum_update_post($post, $mform, &$message) {
+    global $USER, $CFG, $DB;
+    require_once($CFG->dirroot . '/mod/forum/post_form.php');
+
+    $discussion = $DB->get_record('forum_discussions', array('id' => $post->discussion));
+    $forum      = $DB->get_record('forum', array('id' => $discussion->forum));
+    $cm         = get_coursemodule_from_instance('forum', $forum->id);
+    $context    = context_module::instance($cm->id);
+
+    $post->modified = time();
+
+    $DB->update_record('forum_posts', $post);
+
+    $discussion->timemodified = $post->modified; // last modified tracking
+    $discussion->usermodified = $post->userid;   // last modified tracking
+
+    if (!$post->parent) {   // Post is a discussion starter - update discussion title and times too
+        $discussion->name      = $post->subject;
+        $discussion->timestart = $post->timestart;
+        $discussion->timeend   = $post->timeend;
+    }
+    $post->message = file_save_draft_area_files($post->itemid, $context->id, 'mod_forum', 'post', $post->id,
+        mod_forum_post_form::editor_options(), $post->message);
+    $DB->set_field('forum_posts', 'message', $post->message, array('id'=>$post->id));
+
+    $DB->update_record('forum_discussions', $discussion);
+
+    forum_add_attachment($post, $forum, $cm, $mform, $message);
+
+    if (forum_tp_can_track_forums($forum) && forum_tp_is_tracked($forum)) {
+        forum_tp_mark_post_read($post->userid, $post, $post->forum);
+    }
+
+    // Let Moodle know that assessable content is uploaded (eg for plagiarism detection)
+    forum_trigger_content_uploaded_event($post, $cm, 'forum_update_post');
+
+    return true;
+}
+
+/**
+ * Given an object containing all the necessary data,
+ * create a new discussion and return the id
+ *
+ * @param object $post
+ * @param mixed $mform
+ * @param string $unused
+ * @param int $userid
+ * @return object
+ */
+function forum_add_discussion($discussion, $mform=null, $unused=null, $userid=null) {
+    global $USER, $CFG, $DB;
+    require_once($CFG->dirroot . '/mod/forum/post_form.php');
+
+    $timenow = time();
+
+    if (is_null($userid)) {
+        $userid = $USER->id;
+    }
+
+    // The first post is stored as a real post, and linked
+    // to from the discuss entry.
+
+    $forum = $DB->get_record('forum', array('id'=>$discussion->forum));
+    $cm    = get_coursemodule_from_instance('forum', $forum->id);
+
+    $post = new stdClass();
+    $post->discussion    = 0;
+    $post->parent        = 0;
+    $post->userid        = $userid;
+    $post->created       = $timenow;
+    $post->modified      = $timenow;
+    $post->mailed        = FORUM_MAILED_PENDING;
+    $post->subject       = $discussion->name;
+    $post->message       = $discussion->message;
+    $post->messageformat = $discussion->messageformat;
+    $post->messagetrust  = $discussion->messagetrust;
+    $post->attachments   = isset($discussion->attachments) ? $discussion->attachments : null;
+    $post->forum         = $forum->id;     // speedup
+    $post->course        = $forum->course; // speedup
+    $post->mailnow       = $discussion->mailnow;
+
+    $post->id = $DB->insert_record("forum_posts", $post);
+
+    // TODO: Fix the calling code so that there always is a $cm when this function is called
+    if (!empty($cm->id) && !empty($discussion->itemid)) {   // In "single simple discussions" this may not exist yet
+        $context = context_module::instance($cm->id);
+        $text = file_save_draft_area_files($discussion->itemid, $context->id, 'mod_forum', 'post', $post->id,
+            mod_forum_post_form::editor_options(), $post->message);
+        $DB->set_field('forum_posts', 'message', $text, array('id'=>$post->id));
+    }
+
+    // Now do the main entry for the discussion, linking to this first post
+
+    $discussion->firstpost    = $post->id;
+    $discussion->timemodified = $timenow;
+    $discussion->usermodified = $post->userid;
+    $discussion->userid       = $userid;
+
+    $post->discussion = $DB->insert_record("forum_discussions", $discussion);
+
+    // Finally, set the pointer on the post.
+    $DB->set_field("forum_posts", "discussion", $post->discussion, array("id"=>$post->id));
+
+    if (!empty($cm->id)) {
+        forum_add_attachment($post, $forum, $cm, $mform, $unused);
+    }
+
+    if (forum_tp_can_track_forums($forum) && forum_tp_is_tracked($forum)) {
+        forum_tp_mark_post_read($post->userid, $post, $post->forum);
+    }
+
+    // Let Moodle know that assessable content is uploaded (eg for plagiarism detection)
+    if (!empty($cm->id)) {
+        forum_trigger_content_uploaded_event($post, $cm, 'forum_add_discussion');
+    }
+
+    return $post->discussion;
+}
