@@ -596,7 +596,11 @@ function wiki_parse_content($markup, $pagecontent, $options = array()) {
         'printable' => (isset($options['printable']) && $options['printable'])
     );
 
-    return wiki_parser_proxy::parse($pagecontent, $markup, $parser_options);
+    $parsed = wiki_parser_proxy::parse($pagecontent, $markup, $parser_options);
+    if ($parser_options['printable']) {
+        $parsed['parsed_text'] = file_rewrite_pluginfile_urls($parsed['parsed_text'], 'pluginfile.php', $context->id, 'mod_wiki', 'attachments', $subwiki->id);
+    }
+    return $parsed;
 }
 
 /**
