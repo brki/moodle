@@ -23,6 +23,7 @@
 
     require_once('../../config.php');
     require_once('lib.php');
+    require_once('locallib.php');
     require_once($CFG->libdir.'/completionlib.php');
 
     $id          = optional_param('id', 0, PARAM_INT);       // Course Module ID

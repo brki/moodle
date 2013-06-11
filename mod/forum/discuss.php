@@ -48,6 +48,7 @@
 
     // move this down fix for MDL-6926
     require_once($CFG->dirroot.'/mod/forum/lib.php');
+    require_once($CFG->dirroot.'/mod/forum/locallib.php');
 
     $modcontext = context_module::instance($cm->id);
     require_capability('mod/forum:viewdiscussion', $modcontext, NULL, true, 'noviewdiscussionspermission', 'forum');

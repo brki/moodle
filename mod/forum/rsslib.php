@@ -290,6 +290,7 @@ function forum_rss_get_group_sql($cm, $groupmode, $currentgroup, $modcontext=nul
 
 function forum_rss_feed_contents($forum, $sql, $params, $context) {
     global $CFG, $DB, $USER;
+    require_once("$CFG->dirroot/mod/forum/locallib.php");
 
     $status = true;
 

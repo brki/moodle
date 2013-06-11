@@ -25,6 +25,7 @@
 
 require_once("../../config.php");
 require_once("lib.php");
+require_once("locallib.php");
 
 $id    = required_param('id',PARAM_INT);           // forum
 $group = optional_param('group',0,PARAM_INT);      // change of group
