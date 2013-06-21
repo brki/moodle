@@ -25,6 +25,7 @@
 
 require_once("../../config.php");
 require_once("lib.php");
+require_once("locallib.php");
 
 $id         = required_param('id',PARAM_INT);                           // The forum to subscribe or unsubscribe to
 $returnpage = optional_param('returnpage', 'index.php', PARAM_FILE);    // Page to return to.

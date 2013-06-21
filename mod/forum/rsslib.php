@@ -24,6 +24,8 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+require_once("$CFG->dirroot/mod/forum/locallib.php");
+
 /**
  * Returns the path to the cached rss feed contents. Creates/updates the cache if necessary.
  * @param stdClass $context the context

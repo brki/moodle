@@ -25,6 +25,7 @@
 
 require_once("../../config.php");
 require_once("lib.php");
+require_once("locallib.php");
 
 $f          = required_param('f',PARAM_INT); // The forum to mark
 $mark       = required_param('mark',PARAM_ALPHA); // Read or unread?

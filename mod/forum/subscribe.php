@@ -34,6 +34,7 @@
 
 require_once(dirname(dirname(dirname(__FILE__))).'/config.php');
 require_once($CFG->dirroot.'/mod/forum/lib.php');
+require_once($CFG->dirroot.'/mod/forum/locallib.php');
 
 $id      = required_param('id', PARAM_INT);             // the forum to subscribe or unsubscribe to
 $mode    = optional_param('mode', null, PARAM_INT);     // the forum's subscription mode

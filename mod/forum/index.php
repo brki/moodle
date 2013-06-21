@@ -24,6 +24,7 @@
 require_once(dirname(__FILE__) . '/../../config.php');
 require_once($CFG->dirroot . '/course/lib.php');
 require_once($CFG->dirroot . '/mod/forum/lib.php');
+require_once($CFG->dirroot . '/mod/forum/locallib.php');
 require_once($CFG->libdir . '/rsslib.php');
 
 $id = optional_param('id', 0, PARAM_INT);                   // Course id

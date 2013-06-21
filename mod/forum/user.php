@@ -25,6 +25,8 @@
 
 require_once(dirname(dirname(dirname(__FILE__))).'/config.php');
 require_once($CFG->dirroot.'/mod/forum/lib.php');
+require_once($CFG->dirroot.'/mod/forum/locallib.php');
+require_once($CFG->dirroot.'/mod/forum/printlib.php');
 require_once($CFG->dirroot.'/rating/lib.php');
 
 $courseid  = optional_param('course', null, PARAM_INT); // Limit the posts to just this course

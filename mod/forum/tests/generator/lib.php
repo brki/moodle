@@ -25,6 +25,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once("$CFG->dirroot/mod/forum/locallib.php");
 
 /**
  * Forum module data generator class
@@ -66,7 +67,6 @@ class mod_forum_generator extends testing_module_generator {
      */
     public function create_instance($record = null, array $options = null) {
         global $CFG;
-        require_once("$CFG->dirroot/mod/forum/locallib.php");
 
         $this->instancecount++;
         $i = $this->instancecount;

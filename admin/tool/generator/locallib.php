@@ -727,6 +727,7 @@ class generator {
 
     public function generate_forum_posts($course_users, $modules) {
         global $CFG, $DB, $USER;
+        require_once($CFG->dirroot . '/mod/forum/locallib.php');
 
         if (in_array('forum', $this->modules_list) &&
                 $this->get('discussions_per_forum') &&

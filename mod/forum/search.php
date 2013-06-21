@@ -23,6 +23,8 @@
 
 require_once('../../config.php');
 require_once('lib.php');
+require_once('locallib.php');
+require_once('printlib.php');
 
 $id = required_param('id', PARAM_INT);                  // course id
 $search = trim(optional_param('search', '', PARAM_NOTAGS));  // search string
