@@ -2998,36 +2998,6 @@ function assignment_update_grades($assignment, $userid=0, $nullifnone=true) {
 }
 
 /**
- * Update all grades in gradebook.
- */
-function assignment_upgrade_grades() {
-    global $DB;
-
-    $sql = "SELECT COUNT('x')
-              FROM {assignment} a, {course_modules} cm, {modules} m
-             WHERE m.name='assignment' AND m.id=cm.module AND cm.instance=a.id";
-    $count = $DB->count_records_sql($sql);
-
-    $sql = "SELECT a.*, cm.idnumber AS cmidnumber, a.course AS courseid
-              FROM {assignment} a, {course_modules} cm, {modules} m
-             WHERE m.name='assignment' AND m.id=cm.module AND cm.instance=a.id";
-    $rs = $DB->get_recordset_sql($sql);
-    if ($rs->valid()) {
-        // too much debug output
-        $pbar = new progress_bar('assignmentupgradegrades', 500, true);
-        $i=0;
-        foreach ($rs as $assignment) {
-            $i++;
-            upgrade_set_timeout(60*5); // set up timeout, may also abort execution
-            assignment_update_grades($assignment);
-            $pbar->update($i, $count, "Updating Assignment grades ($i/$count).");
-        }
-        upgrade_set_timeout(); // reset to default timeout
-    }
-    $rs->close();
-}
-
-/**
  * Create grade item for given assignment
  *
  * @category grade
