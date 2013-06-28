@@ -14,8 +14,6 @@
     display:none;
 }
 
-.dir-ltr.two-column #region-bs-main-and-pre.span9,
-.dir-rtl.two-column #region-main.span9,
 .empty-region-side-post #region-bs-main-and-pre.span9 {
     width:100%;
 }
@@ -38,6 +36,12 @@
     /** decrease the span size by 1 **/
     .fluid-span(3);
 }
+
+.empty-region-side-post #region-bs-main-and-post.span9 #region-main.span8 {
+    /** RTL with no post area. **/
+    width:100%;
+}
+
 /** Page layout CSS ends **/
 
 .dir-ltr,
