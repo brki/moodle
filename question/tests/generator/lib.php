@@ -72,7 +72,7 @@ class core_question_generator extends component_generator_base {
      */
     public function create_question($qtype, $which = null, $overrides = null) {
         global $CFG;
-        require_once($CFG->dirroot . '/question/engine/tests/helpers.php');
+        require_once($CFG->dirroot . '/question/engine/tests/helpers_general.php');
 
         $fromform = test_question_maker::get_question_form_data($qtype, $which);
         $fromform = (object) $this->datagenerator->combine_defaults_and_record(

@@ -74,6 +74,9 @@ class tool_generator_course_backend extends tool_generator_backend {
      */
     private static $paramforumposts = array(2, 2, 5, 10, 10, 10);
 
+    private static $paramquizzes = array(1, 2, 4, 8, 16, 32);
+    private static $paramquizquestions = array(2, 4, 8, 16, 32, 64);
+
     /**
      * @var string Course shortname
      */
@@ -161,6 +164,7 @@ class tool_generator_course_backend extends tool_generator_backend {
     public function make() {
         global $DB, $CFG;
         require_once($CFG->dirroot . '/lib/phpunit/classes/util.php');
+        require_once($CFG->dirroot . '/question/engine/tests/helpers_general.php');
 
         raise_memory_limit(MEMORY_EXTRA);
 
@@ -183,6 +187,7 @@ class tool_generator_course_backend extends tool_generator_backend {
         $this->create_small_files();
         $this->create_big_files();
         $this->create_forum();
+        $this->create_quiz();
 
         // Log total time.
         $this->log('coursecompleted', round(microtime(true) - $entirestart, 1));
@@ -480,6 +485,48 @@ class tool_generator_course_backend extends tool_generator_backend {
         }
 
         $this->end_log();
+    }
+
+    private function create_quiz() {
+
+        $quizcount = self::$paramquizzes[$this->size];
+
+        $this->log('createquizzes', $quizcount, true);
+        $quizgenerator = $this->generator->get_plugin_generator('mod_quiz');
+
+        for ($i = 0; $i < $quizcount; $i++) {
+            $quiz = $quizgenerator->create_instance(array('course'=>$this->course, 'questionsperpage' => 0, 'grade' => 100.0,
+                'sumgrades' => 2));
+            foreach ($this->quiz_questions() as $question) {
+                quiz_add_quiz_question($question->id, $quiz);
+            }
+        }
+        $this->end_log();
+    }
+
+    /**
+     * Creates a question category and some questions, if not already created (and if this size needs any questions)
+     * @return array of questions
+     */
+    private function quiz_questions() {
+        global $CFG;
+
+        static $questions = array();
+        $questioncount = self::$paramquizquestions[$this->size];
+
+        if (count($questions) < $questioncount) {
+            require_once($CFG->dirroot . '/mod/quiz/editlib.php');
+
+            $questiongenerator = $this->generator->get_plugin_generator('core_question');
+            $cat = $questiongenerator->create_question_category();
+
+            $types = array('multichoice', 'shortanswer', 'numerical');
+            $typecount = count($types);
+            for ($i = 0, $j = 0; $i < $questioncount; $i++, $j = $i % $typecount) {
+                $questions[]= $questiongenerator->create_question($types[$j], null, array('category' => $cat->id));
+            }
+        }
+        return $questions;
     }
 
     /**

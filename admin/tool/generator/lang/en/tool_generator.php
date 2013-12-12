@@ -75,6 +75,7 @@ $string['progress_createbigfiles'] = 'Creating big files ({$a})';
 $string['progress_createcourse'] = 'Creating course {$a}';
 $string['progress_createforum'] = 'Creating forum ({$a} posts)';
 $string['progress_createpages'] = 'Creating pages ({$a})';
+$string['progress_createquizzes'] = 'Creating quizzes ({$a})';
 $string['progress_createsmallfiles'] = 'Creating small files ({$a})';
 $string['progress_enrol'] = 'Enrolling users into course ({$a})';
 $string['progress_sitecompleted'] = 'Site completed ({$a}s)';
