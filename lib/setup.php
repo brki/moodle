@@ -820,6 +820,17 @@ if (isset($_GET['lang']) and ($lang = optional_param('lang', '', PARAM_SAFEDIR))
 }
 unset($lang);
 
+if ($forcelang = optional_param('forcelang', '', PARAM_SAFEDIR)) {
+    if (isloggedin()
+        && get_string_manager()->translation_exists($forcelang, false)
+        && has_capability('moodle/site:forcelanguage', context_system::instance())) {
+        $SESSION->forcelang = $forcelang;
+    } else if (isset($SESSION->forcelang)) {
+        unset($SESSION->forcelang);
+    }
+}
+unset($forcelang);
+
 setup_lang_from_browser();
 
 if (empty($CFG->lang)) {
