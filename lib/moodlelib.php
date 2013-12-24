@@ -4856,6 +4856,7 @@ function set_login_session_preferences() {
     $SESSION->justloggedin = true;
 
     unset($SESSION->lang);
+    unset($SESSION->forcelang);
     unset($SESSION->load_navigation_admin);
 }
 
@@ -6623,7 +6624,14 @@ function clean_filename($string) {
 function current_language() {
     global $CFG, $USER, $SESSION, $COURSE;
 
-    if (!empty($COURSE->id) and $COURSE->id != SITEID and !empty($COURSE->lang)) {
+    if (!empty($SESSION->forcelang)) {
+        // Allows overriding course-forced language (useful for admins to check
+        // issues in courses whose language they don't understand).
+        // Also used by some code to temporarily get language-related information in a
+        // specific language (see moodle_force_language()).
+        $return = $SESSION->forcelang;
+
+    } else if (!empty($COURSE->id) and $COURSE->id != SITEID and !empty($COURSE->lang)) {
         // Course language can override all other settings for this page.
         $return = $COURSE->lang;
 
@@ -6655,14 +6663,10 @@ function current_language() {
  * @return string
  */
 function get_parent_language($lang=null) {
-    global $COURSE, $SESSION;
 
     // Let's hack around the current language.
     if (!empty($lang)) {
-        $oldcourselang  = empty($COURSE->lang) ? '' : $COURSE->lang;
-        $oldsessionlang = empty($SESSION->lang) ? '' : $SESSION->lang;
-        $COURSE->lang  = '';
-        $SESSION->lang = $lang;
+        $oldforcelang = moodle_force_language($lang);
     }
 
     $parentlang = get_string('parentlanguage', 'langconfig');
@@ -6672,11 +6676,31 @@ function get_parent_language($lang=null) {
 
     // Let's hack around the current language.
     if (!empty($lang)) {
-        $COURSE->lang  = $oldcourselang;
-        $SESSION->lang = $oldsessionlang;
+        moodle_force_language($oldforcelang);
     }
 
     return $parentlang;
+}
+
+/**
+ * Some nasty hackery to get strings and dates localised in the given language.
+ *
+ * After calling this function, all strings will be provided in the given language
+ * until this function is called again, or equivalent code is run.
+ *
+ * @param $language
+ * @return string previous $SESSION->forcelang value
+ */
+function moodle_force_language($language) {
+    global $SESSION;
+    $sessionforcelang = isset($SESSION->forcelang) ? $SESSION->forcelang : '';
+    if ($language !== $sessionforcelang) {
+        if (get_string_manager()->translation_exists($language, false)) {
+            $SESSION->forcelang = $language;
+            moodle_setlocale();
+        }
+    }
+    return $sessionforcelang;
 }
 
 /**
